@@ -5,7 +5,7 @@ import io
 import json
 import unittest
 
-from sandboxledger import append_record, create_record, verify_ledger
+from sandboxledger import append_patchgym_run, append_record, create_record, verify_ledger
 from sandboxledger.cli import main
 
 
@@ -32,6 +32,44 @@ class SandboxLedgerTests(unittest.TestCase):
             with redirect_stdout(buffer):
                 self.assertEqual(main(["record", str(ledger), "--command", "pytest -q", "--status", "pass"]), 0)
                 self.assertEqual(main(["verify", str(ledger)]), 0)
+
+    def test_patchgym_run_can_be_ingested(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "run"
+            task_dir = run_dir / "task-1"
+            task_dir.mkdir(parents=True)
+            (run_dir / "report.json").write_text('{"agent":"oracle","results":[]}\n', encoding="utf-8")
+            (run_dir / "trace.jsonl").write_text('{"actor":"patchgym"}\n', encoding="utf-8")
+            (task_dir / "agent.patch").write_text("diff --git a/a b/a\n", encoding="utf-8")
+            (run_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "patchgym.run_manifest.v1",
+                        "agent": "oracle",
+                        "totals": {"tasks": 1, "solved": 1, "failed": 0},
+                        "tasks": [
+                            {
+                                "task_id": "task-1",
+                                "artifacts": {
+                                    "agent_patch": {
+                                        "path": "task-1/agent.patch",
+                                        "bytes": 19,
+                                        "sha256": "not-used-by-ingest",
+                                    }
+                                },
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            ledger = root / "ledger.jsonl"
+            row = append_patchgym_run(ledger, run_dir)
+            self.assertEqual(row["metadata"]["kind"], "patchgym.run")
+            self.assertEqual(row["status"], "pass")
+            self.assertTrue(verify_ledger(ledger)["valid"])
 
 
 if __name__ == "__main__":

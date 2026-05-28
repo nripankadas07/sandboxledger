@@ -24,6 +24,7 @@ python -m pip install -e .
 ```bash
 sandboxledger record ledger.jsonl --command "pytest -q" --status pass
 sandboxledger verify ledger.jsonl
+sandboxledger ingest-patchgym ledger.jsonl .patchgym/runs/latest
 ```
 
 ## Guarantees
@@ -33,6 +34,10 @@ sandboxledger verify ledger.jsonl
 - artifact SHA-256 capture
 - Merkle root summary
 - tamper detection for edited records
+- PatchGym run ingestion for `manifest.json`, `trace.jsonl`, reports, and
+  per-task agent artifacts
+
+See [PatchGym ingestion](docs/patchgym-ingest.md) for the run-ledger flow.
 
 ## Development
 

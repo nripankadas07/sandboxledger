@@ -5,7 +5,7 @@ import json
 import sys
 from typing import List, Optional
 
-from .core import append_record, create_record, verify_ledger
+from .core import append_patchgym_run, append_record, create_record, verify_ledger
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -16,11 +16,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     record.add_argument("--command", dest="run_command", required=True)
     record.add_argument("--status", required=True)
     record.add_argument("--artifact", action="append", default=[])
+    ingest = sub.add_parser("ingest-patchgym", help="append a PatchGym run directory")
+    ingest.add_argument("ledger")
+    ingest.add_argument("run_dir")
     verify = sub.add_parser("verify", help="verify a ledger")
     verify.add_argument("ledger")
     args = parser.parse_args(argv)
     if args.subcommand == "record":
         row = append_record(args.ledger, create_record(args.run_command, args.status, artifacts=args.artifact))
+        print(json.dumps(row, indent=2, sort_keys=True))
+        return 0
+    if args.subcommand == "ingest-patchgym":
+        row = append_patchgym_run(args.ledger, args.run_dir)
         print(json.dumps(row, indent=2, sort_keys=True))
         return 0
     if args.subcommand == "verify":

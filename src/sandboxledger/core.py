@@ -49,6 +49,50 @@ def create_record(
     }
 
 
+def create_patchgym_record(run_dir: Union[str, Path]) -> Dict[str, Any]:
+    run_root = Path(run_dir)
+    manifest_path = run_root / "manifest.json"
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"PatchGym manifest not found: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    totals = manifest.get("totals", {})
+    total = int(totals.get("tasks", 0))
+    solved = int(totals.get("solved", 0))
+    status = "pass" if total and solved == total else "fail"
+    artifact_candidates = [
+        run_root / "manifest.json",
+        run_root / "trace.jsonl",
+        run_root / "report.json",
+        run_root / "report.md",
+        run_root / "index.html",
+    ]
+    for task in manifest.get("tasks", []):
+        for artifact in task.get("artifacts", {}).values():
+            path = artifact.get("path")
+            if path:
+                artifact_candidates.append(run_root / path)
+    artifacts = []
+    seen = set()
+    for path in artifact_candidates:
+        if path.exists() and path not in seen:
+            artifacts.append(path)
+            seen.add(path)
+    return create_record(
+        command=f"patchgym run --agent {manifest.get('agent', 'unknown')}",
+        status=status,
+        artifacts=artifacts,
+        metadata={
+            "kind": "patchgym.run",
+            "patchgym_schema_version": manifest.get("schema_version"),
+            "agent": manifest.get("agent"),
+            "tasks": total,
+            "solved": solved,
+            "failed": int(totals.get("failed", max(0, total - solved))),
+            "run_dir": str(run_root),
+        },
+    )
+
+
 def read_ledger(path: Union[str, Path]) -> List[Dict[str, Any]]:
     p = Path(path)
     if not p.exists():
@@ -101,3 +145,7 @@ def verify_records(records: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
 
 def verify_ledger(path: Union[str, Path]) -> Dict[str, Any]:
     return verify_records(read_ledger(path))
+
+
+def append_patchgym_run(ledger: Union[str, Path], run_dir: Union[str, Path]) -> Dict[str, Any]:
+    return append_record(ledger, create_patchgym_record(run_dir))
